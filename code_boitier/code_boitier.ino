@@ -20,6 +20,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include "mqtt_client.h"   // esp-mqtt (client MQTT natif ESP-IDF, inclus dans le core Arduino ESP32)
+#include "esp_crt_bundle.h" // paquet d'autorités de certification embarqué (TLS)
 #include <ArduinoJson.h>
 #include <time.h>
 #include <Wire.h>
@@ -37,6 +38,14 @@ char wifiSsid[33] = "";                 // vide → démarre en mode portail de 
 char wifiPass[65] = "";
 char mqttHost[64] = "172.30.104.207";   // IP broker par défaut (modifiable dans le portail)
 int  mqttPort     = 1883;
+
+// Broker managé (HiveMQ Cloud, EMQX…) : ces brokers imposent TLS + identifiants.
+// TLS activé => URI "mqtts://" + vérification du certificat via le paquet d'AC
+// embarqué dans l'ESP (aucun certificat à copier à la main).
+// ⚠️ TLS exige une horloge juste : la synchro NTP au démarrage est obligatoire.
+char mqttUser[64] = "";
+char mqttPass[64] = "";
+bool mqttTls      = false;
 
 // Point d'accès de configuration (ouvert — réseau local éphémère, portail captif)
 const char* AP_SSID = "PowerLens-Setup";
@@ -119,7 +128,7 @@ const unsigned long SHT_INTERVAL_MS     = 3000;   // lecture SHT35 réel
 // ─── OBJETS MQTT (esp-mqtt) ───────────────────────────────────────────────────
 esp_mqtt_client_handle_t mqttClient = nullptr;
 volatile bool mqttConnected = false; // MAJ par le handler d'événements (tâche FreeRTOS esp-mqtt)
-char mqttUri[64];                    // "mqtt://host:port" — construit dans setup()
+char mqttUri[128];                   // "mqtts://host:port" — construit dans mqttStart()
 
 // ─── TOPICS ───────────────────────────────────────────────────────────────────
 // Publication : segment bâtiment neutre ("auto") — le backend résout le vrai
@@ -334,12 +343,26 @@ void connectWiFi() {
 // esp-mqtt retente tout seul (reconnect_timeout_ms). Le LWT et les buffers sont
 // posés dans la config, pas dans un connect().
 void mqttStart() {
-  Serial.printf("Connexion MQTT [%s:%d]...\n", mqttHost, mqttPort);
-  snprintf(mqttUri, sizeof(mqttUri), "mqtt://%s:%d", mqttHost, mqttPort);
+  // Schéma selon le mode : "mqtts" (broker managé, chiffré) ou "mqtt" (local).
+  snprintf(mqttUri, sizeof(mqttUri), "%s://%s:%d",
+           mqttTls ? "mqtts" : "mqtt", mqttHost, mqttPort);
+  Serial.printf("Connexion MQTT [%s] %s%s...\n", mqttUri,
+                mqttTls ? "TLS" : "en clair",
+                strlen(mqttUser) > 0 ? " + authentification" : " sans authentification");
 
   esp_mqtt_client_config_t cfg = {};
   cfg.broker.address.uri            = mqttUri;
   cfg.credentials.client_id         = deviceUid;        // clientId = identifiant materiel
+
+  // Authentification (brokers managés) — omise si aucun utilisateur configuré.
+  if (strlen(mqttUser) > 0) {
+    cfg.credentials.username                 = mqttUser;
+    cfg.credentials.authentication.password  = mqttPass;
+  }
+  // TLS : validation du certificat du broker via le paquet d'AC embarqué.
+  if (mqttTls) {
+    cfg.broker.verification.crt_bundle_attach = esp_crt_bundle_attach;
+  }
   cfg.session.keepalive             = MQTT_KEEPALIVE_S; // 15 s (inchangé)
   cfg.session.disable_clean_session = false;            // clean session = true (inchangé)
   // LWT : {online:false} QoS 1 retained, publié par le broker à notre place.
@@ -819,6 +842,9 @@ void loadConfig() {
   copyToBuf(wifiPass, sizeof(wifiPass), prefs.getString("wifi_pass", wifiPass));
   copyToBuf(mqttHost, sizeof(mqttHost), prefs.getString("mqtt_host", mqttHost));
   mqttPort = prefs.getInt("mqtt_port", mqttPort);
+  copyToBuf(mqttUser, sizeof(mqttUser), prefs.getString("mqtt_user", mqttUser));
+  copyToBuf(mqttPass, sizeof(mqttPass), prefs.getString("mqtt_pass", mqttPass));
+  mqttTls = prefs.getBool("mqtt_tls", mqttTls);
 
   // Identité auto-déclarée : nom du boîtier + UUID de la zone supervisée.
   copyToBuf(deviceName, sizeof(deviceName), prefs.getString("dev_name", ""));
@@ -910,6 +936,9 @@ void saveWifiConfig() {
   prefs.putString("wifi_pass", wifiPass);
   prefs.putString("mqtt_host", mqttHost);
   prefs.putInt("mqtt_port", mqttPort);
+  prefs.putString("mqtt_user", mqttUser);
+  prefs.putString("mqtt_pass", mqttPass);
+  prefs.putBool("mqtt_tls", mqttTls);
   prefs.putString("dev_name", deviceName); // nom du boîtier (saisi dans le même formulaire)
   prefs.end();
 }
@@ -1011,6 +1040,13 @@ void handleSaveWifi() {
     }
   }
 
+  // Identifiants du broker (brokers managés type HiveMQ) + chiffrement TLS.
+  if (server.hasArg("muser")) copyToBuf(mqttUser, sizeof(mqttUser), server.arg("muser"));
+  // Mot de passe : mis à jour seulement si non vide (laissé vide = inchangé).
+  if (server.hasArg("mpass") && server.arg("mpass").length() > 0)
+    copyToBuf(mqttPass, sizeof(mqttPass), server.arg("mpass"));
+  mqttTls = server.hasArg("mtls"); // case à cocher : absente du POST si décochée
+
   saveWifiConfig();
   server.send(200, "text/html; charset=utf-8",
     "<meta charset='utf-8'><body style='font-family:system-ui;padding:2rem'>"
@@ -1108,7 +1144,14 @@ String configPageHtml() {
   h += mqttHost;
   h += F(":");
   h += String(mqttPort);
-  h += F("'><div class='hint'>IP:port en local (ex. 172.30.104.207:1883) ou l'adresse ngrok (ex. 0.tcp.ngrok.io:14872).</div>"
+  h += F("'><div class='hint'>Local : IP:port (ex. 192.168.1.10:1883). Broker cloud : hote:8883 (ex. abc123.s1.eu.hivemq.cloud:8883).</div>"
+         "<div class='chk'><input type='checkbox' id='mtls' name='mtls'");
+  h += (mqttTls ? F(" checked") : F(""));
+  h += F("><label for='mtls' class='inline'>Connexion securisee TLS (broker cloud)</label></div>"
+         "<label>Utilisateur MQTT</label><input name='muser' value='");
+  h += mqttUser;
+  h += F("' placeholder='(vide si broker local)'>"
+         "<label>Mot de passe MQTT</label><input name='mpass' type='password' placeholder='(inchange si vide)'>"
          "<button type='submit'>Enregistrer &amp; redemarrer</button></form></section>");
 
   // ── Section 2 : Relais (toggles live, bien visibles) ──
