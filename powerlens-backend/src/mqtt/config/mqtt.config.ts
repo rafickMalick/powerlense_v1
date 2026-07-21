@@ -1,5 +1,10 @@
 export const mqttConfig = {
   brokerUrl: process.env.MQTT_BROKER_URL ?? 'mqtt://localhost:1883',
+  // Identifiants du broker — vides en local (Mosquitto anonyme), requis par les
+  // brokers managés (HiveMQ Cloud, EMQX…) qui imposent TLS + authentification.
+  // L'URL passe alors de `mqtt://host:1883` à `mqtts://host:8883`.
+  username: process.env.MQTT_USERNAME || undefined,
+  password: process.env.MQTT_PASSWORD || undefined,
   clientId: 'rule-engine-client',
   options: {
     clean: true,

@@ -46,7 +46,8 @@
     "start": "expo start --port 8082",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "build:web": "expo export --platform web --output-dir dist"
   },
   "private": true
 }

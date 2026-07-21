@@ -19,6 +19,8 @@ async function bootstrap() {
     origin: process.env.CORS_ORIGINS?.split(',') ?? false,
     credentials: true,
   });
-  await app.listen(process.env.PORT ?? 3000);
+  // '0.0.0.0' est requis par les hébergeurs conteneurisés (Render, Railway…) :
+  // sans ça le service n'écoute que sur la boucle locale et le proxy ne le voit pas.
+  await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
 }
 void bootstrap();

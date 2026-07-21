@@ -13,6 +13,10 @@ export class MqttService implements OnModuleDestroy {
   constructor(private readonly auditService: AuditService) {
     this.client = mqtt.connect(mqttConfig.brokerUrl, {
       clientId: mqttConfig.clientId,
+      // Identifiants transmis uniquement s'ils sont définis (broker managé) —
+      // un Mosquitto local anonyme les ignore.
+      username: mqttConfig.username,
+      password: mqttConfig.password,
       ...mqttConfig.options,
     });
 
