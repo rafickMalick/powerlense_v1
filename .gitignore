@@ -14,6 +14,11 @@ metro.log
 *.jpg
 *.jpeg
 *.gif
+
+# EXCEPTION : les assets de l'application (icônes, logo, splash) sont
+# indispensables au build — sans eux `expo export` échoue. Les règles d'images
+# ci-dessus ne visent que les captures d'écran de développement à la racine.
+!powerlens-mobile/assets/**
 *.bmp
 *.docx
 *.xlsx
