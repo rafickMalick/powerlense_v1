@@ -36,8 +36,11 @@
 // puis sur l'IP LAN). Les valeurs ci-dessous ne sont que des DÉFAUTS d'usine.
 char wifiSsid[33] = "";                 // vide → démarre en mode portail de config
 char wifiPass[65] = "";
-char mqttHost[64] = "172.30.104.207";   // IP broker par défaut (modifiable dans le portail)
-int  mqttPort     = 1883;
+// AUCUNE adresse de broker en dur : elle se saisit dans le portail et vit en
+// mémoire (NVS). Le code reste ainsi neutre — le même firmware convient à
+// n'importe quel déploiement (broker local, cloud, autre client).
+char mqttHost[64] = "";                 // vide → à renseigner dans le portail
+int  mqttPort     = 1883;               // port par défaut, surchargé par le portail
 
 // Broker managé (HiveMQ Cloud, EMQX…) : ces brokers imposent TLS + identifiants.
 // TLS activé => URI "mqtts://" + vérification du certificat via le paquet d'AC
@@ -264,7 +267,14 @@ void setup() {
       delay(500);
     }
     Serial.println(getLocalTime(&timeinfo) ? " OK" : " ECHEC (horodatage par défaut)");
-    mqttStart();
+    // Pas d'adresse de broker enregistrée → on ne tente rien (une URI vide
+    // ferait boucler esp-mqtt sur des erreurs). Le portail reste accessible
+    // sur l'IP du boîtier pour la renseigner.
+    if (strlen(mqttHost) > 0) {
+      mqttStart();
+    } else {
+      Serial.println("Aucun broker configure — ouvre le portail du boitier pour le renseigner.");
+    }
   } else {
     startProvisioningAP(); // SoftAP "PowerLens-Setup" + DNS captif
   }
@@ -1141,10 +1151,13 @@ String configPageHtml() {
   h += wifiSsid;
   h += F("'><label>Mot de passe WiFi</label><input name='pass' type='password' placeholder='(inchange si vide)'>"
          "<label>Adresse du broker</label><input name='broker' value='");
-  h += mqttHost;
-  h += F(":");
-  h += String(mqttPort);
-  h += F("'><div class='hint'>Local : IP:port (ex. 192.168.1.10:1883). Broker cloud : hote:8883 (ex. abc123.s1.eu.hivemq.cloud:8883).</div>"
+  // Champ vide (avec exemple en filigrane) tant qu'aucun broker n'est enregistré.
+  if (strlen(mqttHost) > 0) {
+    h += mqttHost;
+    h += F(":");
+    h += String(mqttPort);
+  }
+  h += F("' placeholder='hote:port'><div class='hint'>Local : IP:port (ex. 192.168.1.10:1883). Broker cloud : hote:8883 (ex. abc123.s1.eu.hivemq.cloud:8883).</div>"
          "<div class='chk'><input type='checkbox' id='mtls' name='mtls'");
   h += (mqttTls ? F(" checked") : F(""));
   h += F("><label for='mtls' class='inline'>Connexion securisee TLS (broker cloud)</label></div>"
