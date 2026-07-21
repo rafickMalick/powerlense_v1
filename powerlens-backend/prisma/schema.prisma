@@ -1,0 +1,425 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/**
+ * ===========================
+ * ENUMS
+ * ===========================
+ */
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  VIEWER
+}
+
+enum DeviceStatus {
+  ONLINE
+  OFFLINE
+  MAINTENANCE
+}
+
+enum ZoneType {
+  BUILDING
+  CORRIDOR
+  ROOM
+}
+
+enum CircuitType {
+  LIGHTING
+  SOCKET
+  HVAC
+  FAN
+}
+
+enum RuleType {
+  SCHEDULE
+  THRESHOLD
+  PRESENCE
+  EVENT
+  COMBINED
+}
+
+enum AlertLevel {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum RecommendationType {
+  CREATE_RULE
+  MODIFY_RULE
+  DELETE_RULE
+}
+
+enum RecommendationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  APPLIED
+}
+
+enum RecommendationConfidence {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum SupervisorRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum BuildingPowerStatus {
+  POWERED
+  LIMITED
+  CUTOFF
+}
+
+/**
+ * ===========================
+ * USERS
+ * ===========================
+ */
+
+model User {
+  id           String   @id @default(uuid())
+  fullName     String
+  email        String   @unique
+  passwordHash String
+  role         UserRole
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  reviewedRecommendations RuleRecommendation[]
+}
+
+/**
+ * ===========================
+ * STRUCTURE PHYSIQUE
+ * ===========================
+ */
+
+model Building {
+  id           String              @id @default(uuid())
+  name         String
+  location     String
+  description  String?
+  powerStatus  BuildingPowerStatus @default(POWERED)
+  tariffPlanId String?
+  createdAt    DateTime            @default(now())
+
+  tariffPlan TariffPlan? @relation(fields: [tariffPlanId], references: [id])
+
+  zones           MonitoringZone[]
+  devices         Device[]
+  rules           Rule[]
+  alerts          Alert[]
+  recommendations RuleRecommendation[]
+  billingRecords  BillingRecord[]
+}
+
+model MonitoringZone {
+  id         String   @id @default(uuid())
+  name       String
+  type       ZoneType
+  floor      Int?
+  buildingId String
+  parentId   String?
+  createdAt  DateTime @default(now())
+
+  building Building         @relation(fields: [buildingId], references: [id])
+  parent   MonitoringZone?  @relation("ZoneHierarchy", fields: [parentId], references: [id])
+  children MonitoringZone[] @relation("ZoneHierarchy")
+  circuits Circuit[]
+
+  measurements EnergyMeasurement[]
+  channels     Channel[]
+  alerts       Alert[]
+}
+
+model Device {
+  id              String       @id @default(uuid())
+  deviceUid       String       @unique
+  /// Nom convivial du boîtier, défini dans son portail de configuration et
+  /// remonté par son message `announce`. C'est ce nom qui s'affiche dans l'app.
+  name            String?
+  firmwareVersion String?
+  lastSeen        DateTime?
+  status          DeviceStatus @default(OFFLINE)
+  buildingId      String
+
+  building Building  @relation(fields: [buildingId], references: [id])
+  circuits Circuit[]
+}
+
+/**
+ * ===========================
+ * CIRCUITS
+ * ===========================
+ */
+
+model Circuit {
+  id           String      @id @default(uuid())
+  name         String
+  type         CircuitType
+  maxPowerWatt Int?
+  /// Pin physique du relais sur le device, remontée par l'ESP dans son payload
+  /// de mesure (provisioning côté firmware). Permet de savoir quel circuit est
+  /// câblé sur quelle broche. Null tant qu'aucun device ne l'a rapportée.
+  pin          Int?
+  isActive     Boolean     @default(true)
+  isCritical   Boolean     @default(false)
+
+  deviceId String
+  zoneId   String
+
+  device Device         @relation(fields: [deviceId], references: [id])
+  zone   MonitoringZone @relation(fields: [zoneId], references: [id])
+
+  measurements EnergyMeasurement[]
+  channels     Channel[]
+}
+
+/**
+ * ===========================
+ * ENERGY MEASUREMENTS
+ * ===========================
+ */
+
+model Channel {
+  id        String   @id @default(uuid())
+  type      String
+  unit      String
+  mqttTopic String?
+  circuitId String?
+  zoneId    String?
+  createdAt DateTime @default(now())
+
+  circuit Circuit?        @relation(fields: [circuitId], references: [id])
+  zone    MonitoringZone? @relation(fields: [zoneId], references: [id])
+
+  @@index([zoneId])
+}
+
+model EnergyMeasurement {
+  id          BigInt   @id @default(autoincrement())
+  voltage     Float?
+  current     Float?
+  power       Float?
+  energyKwh   Float?
+  frequency   Float?
+  powerFactor Float?
+  luminosity  Float?
+  presence    Boolean?
+  temperature Float?
+  measuredAt  DateTime
+
+  /// Conservé pour l'historique pré-V4 (mesures par circuit) — non alimenté pour les nouvelles mesures, qui sont rattachées à une zone.
+  circuitId String?
+  circuit   Circuit? @relation(fields: [circuitId], references: [id])
+
+  zoneId String?
+  zone   MonitoringZone? @relation(fields: [zoneId], references: [id])
+
+  @@index([circuitId, measuredAt])
+  @@index([zoneId, measuredAt])
+}
+
+/**
+ * ===========================
+ * RULE ENGINE
+ * ===========================
+ */
+
+model Rule {
+  id         String   @id @default(uuid())
+  name       String
+  ruleType   RuleType
+  conditions Json
+  actions    Json
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  buildingId String
+  building   Building @relation(fields: [buildingId], references: [id])
+
+  alerts          Alert[]
+  recommendations RuleRecommendation[]
+}
+
+/**
+ * ===========================
+ * ALERTS
+ * ===========================
+ */
+
+model Alert {
+  id           String     @id @default(uuid())
+  level        AlertLevel
+  message      String
+  createdAt    DateTime   @default(now())
+  acknowledged Boolean    @default(false)
+
+  buildingId String?
+  ruleId     String?
+  /// Portée ROOM/CORRIDOR de l'alerte (RC1) — null = alerte bâtiment entier.
+  /// Permet le routage MQTT par device (AlertsService) et le classement par
+  /// zone (fréquence d'alertes). Additive, aucune donnée existante affectée.
+  zoneId     String?
+
+  building Building?       @relation(fields: [buildingId], references: [id])
+  rule     Rule?           @relation(fields: [ruleId], references: [id])
+  zone     MonitoringZone? @relation(fields: [zoneId], references: [id])
+
+  @@index([createdAt])
+  @@index([buildingId, createdAt])
+  @@index([zoneId, createdAt])
+  @@index([acknowledged, buildingId])
+}
+
+/**
+ * ===========================
+ * AUDIT LOG
+ * ===========================
+ */
+
+model AuditLog {
+  id         BigInt   @id @default(autoincrement())
+  actorType  String
+  actorId    String?
+  action     String
+  targetType String
+  targetId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action, targetType, createdAt])
+}
+
+/**
+ * ===========================
+ * SMART SUPERVISOR (V2)
+ * ===========================
+ */
+
+model RuleRecommendation {
+  id                  String                   @id @default(uuid())
+  type                RecommendationType
+  title               String
+  justification       String
+  detectorKey         String
+  proposedConditions  Json?
+  proposedActions     Json?
+  estimatedImpact     String
+  estimatedSavingsKwh Float?
+  estimatedSavingsEur Float?
+  confidence          RecommendationConfidence
+  status              RecommendationStatus     @default(PENDING)
+  author              String                   @default("AI")
+
+  buildingId String
+  building   Building @relation(fields: [buildingId], references: [id])
+
+  targetRuleId String?
+  targetRule   Rule?   @relation(fields: [targetRuleId], references: [id])
+
+  appliedRuleId String?
+
+  approverId    String?
+  approver      User?     @relation(fields: [approverId], references: [id])
+  reviewComment String?
+  reviewedAt    DateTime?
+
+  detectionWindowFrom DateTime
+  detectionWindowTo   DateTime
+  supervisorRunId     String
+  supervisorRun       SupervisorRun @relation(fields: [supervisorRunId], references: [id])
+
+  createdAt      DateTime  @default(now())
+  lastDetectedAt DateTime  @default(now())
+  appliedAt      DateTime?
+
+  @@index([buildingId, status])
+  @@index([status, createdAt])
+  @@index([targetRuleId])
+}
+
+model SupervisorRun {
+  id                     String              @id @default(uuid())
+  startedAt              DateTime            @default(now())
+  finishedAt             DateTime?
+  status                 SupervisorRunStatus @default(RUNNING)
+  buildingsScanned       Int                 @default(0)
+  recommendationsCreated Int                 @default(0)
+  errorMessage           String?
+
+  recommendations RuleRecommendation[]
+
+  @@index([startedAt])
+}
+
+/**
+ * ===========================
+ * FACTURATION (tarifs SBEE)
+ * ===========================
+ */
+
+enum TariffCategory {
+  BT1_DOMESTIC // Usage domestique — tranches sociale (86) / 1 (125) / 2 (148)
+  BT2_PRO      // Usage professionnel — 125 FCFA/kWh à tranche unique
+  BT3_PUBLIC   // Éclairage public — 133 FCFA/kWh à tranche unique
+}
+
+/// Tarif progressif continu : le prix marginal du kWh augmente avec la
+/// consommation cumulée du mois en cours — pricePerKwhFcfa est le prix de
+/// base (à 0 kWh), growthCoefficientFcfa l'augmentation par kWh cumulé
+/// (prix marginal = pricePerKwhFcfa + growthCoefficientFcfa × kWh cumulé).
+model TariffPlan {
+  id                    String         @id @default(uuid())
+  name                  String
+  category              TariffCategory @default(BT2_PRO)
+  pricePerKwhFcfa       Float
+  growthCoefficientFcfa Float          @default(0)
+  /// Charges fixes de la facture SBEE (montants mensuels en FCFA). Elles ne
+  /// figurent pas sur la grille tarifaire publique — à renseigner selon le
+  /// contrat de l'abonné. Défaut 0 tant qu'elles ne sont pas connues.
+  fixedChargeDFcfa      Float          @default(0) // Prime fixe (D) — assujettie à la TVA
+  taxEFcfa              Float          @default(0) // Taxe sur Électricité (E) — hors TVA
+  taxFFcfa              Float          @default(0) // Fonds d'Électrification Rurale (F) — hors TVA
+  vatRate               Float          @default(0.18) // TVA (18 %) sur (consommation + D)
+  currency              String         @default("XOF")
+  isActive              Boolean        @default(true)
+  effectiveFrom         DateTime       @default(now())
+  createdAt             DateTime       @default(now())
+
+  buildings      Building[]
+  billingRecords BillingRecord[]
+}
+
+model BillingRecord {
+  id                    String   @id @default(uuid())
+  buildingId            String
+  tariffPlanId          String
+  periodStart           DateTime
+  periodEnd             DateTime
+  totalKwh              Float
+  totalCostFcfa         Float
+  pricePerKwhFcfa       Float
+  growthCoefficientFcfa Float    @default(0)
+  generatedAt           DateTime @default(now())
+
+  building   Building   @relation(fields: [buildingId], references: [id])
+  tariffPlan TariffPlan @relation(fields: [tariffPlanId], references: [id])
+
+  @@unique([buildingId, periodStart])
+  @@index([buildingId, periodStart])
+}

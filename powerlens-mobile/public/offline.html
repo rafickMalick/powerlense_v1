@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PowerLens — Hors ligne</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #F8FAFC;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      color: #0F172A;
+    }
+    .card {
+      max-width: 360px;
+      text-align: center;
+      padding: 32px;
+    }
+    .icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 16px;
+      background: #1E40AF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 28px;
+      color: white;
+    }
+    h1 {
+      font-size: 20px;
+      margin: 0 0 8px;
+    }
+    p {
+      font-size: 14px;
+      color: #64748B;
+      line-height: 1.5;
+      margin: 0;
+    }
+    button {
+      margin-top: 24px;
+      background: #1E40AF;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">⚡</div>
+    <h1>Vous êtes hors ligne</h1>
+    <p>PowerLens n'a pas pu se connecter au réseau. Vérifiez votre connexion puis réessayez.</p>
+    <button onclick="location.reload()">Réessayer</button>
+  </div>
+</body>
+</html>

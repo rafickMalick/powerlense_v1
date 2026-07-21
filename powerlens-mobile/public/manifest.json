@@ -1,0 +1,25 @@
+{
+  "name": "PowerLens",
+  "short_name": "PowerLens",
+  "description": "Plateforme de supervision énergétique temps réel",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#1E40AF",
+  "lang": "fr",
+  "categories": ["business", "utilities"],
+  "icons": [
+    {
+      "src": "/icon-48.png",
+      "sizes": "48x48",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

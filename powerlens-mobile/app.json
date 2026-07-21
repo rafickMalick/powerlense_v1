@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "powerlens-mobile",
+    "slug": "powerlens-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.gillesto66.powerlensmobile"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "name": "PowerLens",
+      "shortName": "PowerLens",
+      "description": "Plateforme de supervision énergétique temps réel",
+      "themeColor": "#1E40AF",
+      "backgroundColor": "#ffffff",
+      "display": "standalone",
+      "orientation": "any",
+      "lang": "fr"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-font"
+    ],
+    "updates": {
+      "checkAutomatically": "NEVER"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "873a89b8-1dda-461c-9c0a-8d3c3328cef8"
+      }
+    }
+  }
+}
