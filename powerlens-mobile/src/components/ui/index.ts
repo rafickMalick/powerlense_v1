@@ -16,3 +16,4 @@ export * from './Chip';
 export * from './Skeleton';
 export * from './ErrorState';
 export * from './WizardShell';
+export { PowerGauge } from './PowerGauge';

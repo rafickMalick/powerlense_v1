@@ -2,15 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, useWindowDimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import {
-  Activity,
-  TrendingDown,
-  TrendingUp,
   Building2,
-  Bell,
-  Zap,
   Wifi,
   WifiOff,
-  Sparkles,
   Power,
   ChevronRight,
   Clock,
@@ -23,45 +17,20 @@ import { useAlertsStore } from '@/store/alertsStore';
 import { useSupervisorStore } from '@/store/supervisorStore';
 import { useUiStore } from '@/store/uiStore';
 import { useAuthStore } from '@/store/authStore';
-import { Card, EmptyState, ProgressBar, Button } from '@/components/ui';
+import { Card, EmptyState, ProgressBar, Button, PowerGauge } from '@/components/ui';
 import { ConsumptionAreaChart } from '@/components/charts/ConsumptionAreaChart';
 import * as zonesService from '@/services/zones';
 import { getAuditLogs } from '@/services/auditLogs';
 import { formatAction } from '@/services/reports';
 import { palette } from '@/theme/colors';
-import { InfoTooltip } from '@/components/onboarding/InfoTooltip';
 import { useScreenViewLogging } from '@/hooks/useScreenViewLogging';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import type { AuditLog } from '@/types/models';
-
-interface StatusPillProps {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-  tone?: 'default' | 'danger' | 'success';
-  minWidthClass: string;
-}
-
-function StatusPill({ icon: Icon, label, value, tone = 'default', minWidthClass }: StatusPillProps) {
-  const iconColor = tone === 'danger' ? palette.danger : tone === 'success' ? palette.success : palette.navy700;
-  const valueClass = tone === 'danger' ? 'text-danger' : tone === 'success' ? 'text-success' : 'text-text-primary';
-
-  return (
-    <Card className={`flex-1 ${minWidthClass}`}>
-      <View className="flex-row items-center gap-2 mb-1">
-        <Icon size={14} color={iconColor} />
-        <Text className="text-xs text-text-secondary" numberOfLines={1}>{label}</Text>
-      </View>
-      <Text className={`text-base font-semibold ${valueClass}`} numberOfLines={1}>{value}</Text>
-    </Card>
-  );
-}
 
 export function DashboardScreen() {
   useScreenViewLogging('Dashboard');
   const navigation = useNavigation<any>();
   const breakpoint = useBreakpoint();
-  const pillMinWidthClass = breakpoint === 'desktop' ? 'min-w-[22%]' : breakpoint === 'tablet' ? 'min-w-[30%]' : 'min-w-[45%]';
   const building = useActiveBuilding();
   const user = useAuthStore((s) => s.user);
   const rooms = useRoomStore((s) => s.rooms);
@@ -152,7 +121,6 @@ export function DashboardScreen() {
     return <EmptyState icon={Building2} title="Aucun bâtiment sélectionné" />;
   }
 
-  const displayPower = (totalPower / 1000).toFixed(1);
 
   const displayEnergy =
     energyTodayKwh >= 1000 ? `${(energyTodayKwh / 1000).toFixed(2)} MWh` : `${energyTodayKwh.toFixed(2)} kWh`;
@@ -167,83 +135,67 @@ export function DashboardScreen() {
       : providerMode === 'simulator'
         ? 'Simulation'
         : 'Temps réel';
-  const connectionIcon = !socketConnected || espUnreachable ? WifiOff : Wifi;
   const connectionTone = !socketConnected || espUnreachable ? 'danger' : 'success';
 
   return (
     <ScrollView className="flex-1 bg-surface-alt" contentContainerStyle={{ padding: 16, gap: 16 }}>
-      {/* Building Info */}
-      <Card>
-        <Text className="text-sm font-medium text-text-secondary mb-1">TABLEAU DE BORD</Text>
-        <Text className="text-xl font-bold text-text-primary">{building.name}</Text>
+      {/* Salutation — maquette « Tableau de bord » du handoff */}
+      <View>
+        <Text className="text-2xl font-bold text-text-primary">Bonjour</Text>
+        <Text className="text-sm text-text-secondary mt-1">
+          {building.name} ·{' '}
+          {activeAlertsCount > 0
+            ? `${activeAlertsCount} alerte${activeAlertsCount > 1 ? 's' : ''} à traiter`
+            : 'Tout fonctionne normalement'}
+        </Text>
+      </View>
+
+      {/* Jauge circulaire — élément central de la maquette */}
+      <Card className="items-center py-6">
+        <PowerGauge
+          watts={totalPower}
+          caption={connectionValue === 'Temps réel' ? 'en direct' : connectionValue}
+        />
       </Card>
 
-      {/* Pastilles de statut */}
-      <View className="flex-row items-center gap-2 -mb-1">
-        <Text className="text-xs text-text-secondary font-medium">APERÇU</Text>
-        <InfoTooltip
-          tooltipKey="dashboard-pills"
-          title="Aperçu"
-          description="Alertes actives (non acquittées), circuits actuellement sous tension, état de la connexion temps réel, et suggestions en attente du Smart Supervisor."
-        />
-      </View>
-      <View className="flex-row flex-wrap gap-3">
-        <StatusPill
-          icon={Bell}
-          label="Alertes actives"
-          value={String(activeAlertsCount)}
-          tone={activeAlertsCount > 0 ? 'danger' : 'default'}
-          minWidthClass={pillMinWidthClass}
-        />
-        <StatusPill
-          icon={Zap}
-          label="Circuits actifs"
-          value={`${activeCircuits.active}/${activeCircuits.total}`}
-          minWidthClass={pillMinWidthClass}
-        />
-        <StatusPill
-          icon={connectionIcon}
-          label="Connexion"
-          value={connectionValue}
-          tone={connectionTone}
-          minWidthClass={pillMinWidthClass}
-        />
+      {/* 3 KPIs texte, comme la maquette */}
+      <View className="flex-row gap-3">
+        <Card className="flex-1">
+          <Text className="text-xs text-text-secondary">Consommation du jour</Text>
+          <Text className="text-lg font-bold text-text-primary mt-1">{displayEnergy}</Text>
+          <Text className="text-xs text-text-muted mt-0.5">depuis minuit</Text>
+        </Card>
+        <Card className="flex-1">
+          <Text className="text-xs text-text-secondary">Circuits actifs</Text>
+          <Text className="text-lg font-bold text-text-primary mt-1">
+            {activeCircuits.active}
+            <Text className="text-sm font-normal text-text-secondary">
+              {' '}
+              sur {activeCircuits.total}
+            </Text>
+          </Text>
+          <Text className="text-xs text-text-muted mt-0.5">sous tension</Text>
+        </Card>
         {isSupervisorAdmin && (
-          <StatusPill
-            icon={Sparkles}
-            label="Suggestions IA"
-            value={String(pendingRecommendationsCount)}
-            minWidthClass={pillMinWidthClass}
-          />
+          <Card className="flex-1">
+            <Text className="text-xs text-text-secondary">Suggestions IA</Text>
+            <Text className="text-lg font-bold text-text-primary mt-1">
+              {pendingRecommendationsCount}
+            </Text>
+            <Text className="text-xs text-text-muted mt-0.5">
+              {pendingRecommendationsCount > 1 ? 'nouvelles' : 'nouvelle'}
+            </Text>
+          </Card>
         )}
       </View>
 
-      {/* Real-time Metrics */}
-      <View className="flex-row gap-4">
-        <Card className="flex-1">
-          <View className="flex-row items-center gap-2 mb-2">
-            <Activity color={palette.success} size={16} />
-            <Text className="text-xs text-text-secondary">Puissance Actuelle</Text>
-          </View>
-          <Text className="text-2xl font-mono font-bold text-success">{displayPower} kW</Text>
-          <View className="flex-row items-center gap-1 mt-1">
-            <TrendingDown color={palette.success} size={12} />
-            <Text className="text-xs text-success">temps réel</Text>
-          </View>
+      {/* Alerte visible en tête si la connexion est dégradée */}
+      {connectionTone === 'danger' && (
+        <Card className="flex-row items-center gap-2 border-danger">
+          <WifiOff color={palette.danger} size={16} />
+          <Text className="text-sm text-danger">{connectionValue}</Text>
         </Card>
-
-        <Card className="flex-1">
-          <View className="flex-row items-center gap-2 mb-2">
-            <Activity color={palette.navy700} size={16} />
-            <Text className="text-xs text-text-secondary">Conso. Journée</Text>
-          </View>
-          <Text className="text-2xl font-mono font-bold text-primary">{displayEnergy}</Text>
-          <View className="flex-row items-center gap-1 mt-1">
-            <TrendingUp color={palette.gray500} size={12} />
-            <Text className="text-xs text-text-secondary">depuis minuit</Text>
-          </View>
-        </Card>
-      </View>
+      )}
 
       {/* Contrôle rapide */}
       <Card>
