@@ -150,14 +150,19 @@ export function RoomDetailScreen({ route, navigation }: Props) {
               <Text className="text-text-muted text-sm">Aucun circuit configuré</Text>
             ) : (
               circuits.map((circuit) => (
-                <Pressable
+                /* La ligne n'est PAS cliquable dans son ensemble : sinon un appui
+                   sur l'interrupteur se propagerait et ouvrirait le détail du
+                   circuit. Seules la zone du nom et la flèche naviguent. */
+                <View
                   key={circuit.id}
                   className="flex-row items-center justify-between p-3 bg-surface rounded border border-border"
-                  onPress={() =>
-                    navigation.navigate('CircuitDetail', { circuitId: circuit.id, roomId })
-                  }
                 >
-                  <View className="flex-row items-center gap-2">
+                  <Pressable
+                    className="flex-row items-center gap-2 flex-1"
+                    onPress={() =>
+                      navigation.navigate('CircuitDetail', { circuitId: circuit.id, roomId })
+                    }
+                  >
                     <Zap color={palette.navy700} size={16} />
                     <View>
                       <Text className="text-sm text-text-primary">{circuit.name}</Text>
@@ -165,7 +170,7 @@ export function RoomDetailScreen({ route, navigation }: Props) {
                         <Text className="text-xs text-text-muted">Pin {circuit.pin}</Text>
                       )}
                     </View>
-                  </View>
+                  </Pressable>
                   <View className="flex-row items-center gap-3">
                     {circuit.maxPowerWatt != null && (
                       <Text className="text-sm font-mono text-success">
@@ -177,9 +182,16 @@ export function RoomDetailScreen({ route, navigation }: Props) {
                       disabled={espUnreachable}
                       onValueChange={() => { void toggleCircuit(roomId, circuit); }}
                     />
-                    <ChevronRight color={palette.gray400} size={16} />
+                    <Pressable
+                      hitSlop={8}
+                      onPress={() =>
+                        navigation.navigate('CircuitDetail', { circuitId: circuit.id, roomId })
+                      }
+                    >
+                      <ChevronRight color={palette.gray400} size={16} />
+                    </Pressable>
                   </View>
-                </Pressable>
+                </View>
               ))
             )}
           </View>
@@ -225,17 +237,20 @@ export function RoomDetailScreen({ route, navigation }: Props) {
             <Text className="text-text-muted text-sm">Aucun circuit configuré</Text>
           ) : (
             circuits.map((circuit) => (
-              <Pressable
+              /* Même principe : l'interrupteur est hors de la zone qui navigue. */
+              <View
                 key={circuit.id}
                 className="flex-row items-center justify-between p-3 bg-surface rounded border border-border"
-                onPress={() =>
-                  navigation.navigate('CircuitDetail', { circuitId: circuit.id, roomId })
-                }
               >
-                <View className="flex-row items-center gap-2">
+                <Pressable
+                  className="flex-row items-center gap-2 flex-1"
+                  onPress={() =>
+                    navigation.navigate('CircuitDetail', { circuitId: circuit.id, roomId })
+                  }
+                >
                   <Zap color={palette.navy700} size={16} />
                   <Text className="text-sm text-text-primary">{circuit.name}</Text>
-                </View>
+                </Pressable>
                 <View className="flex-row items-center gap-3">
                   {circuit.maxPowerWatt != null && (
                     <Text className="text-sm font-mono text-success">
@@ -247,9 +262,16 @@ export function RoomDetailScreen({ route, navigation }: Props) {
                     disabled={room.status === 'cutoff' || espUnreachable}
                     onValueChange={() => { void toggleCircuit(roomId, circuit); }}
                   />
-                  <ChevronRight color={palette.gray400} size={16} />
+                  <Pressable
+                    hitSlop={8}
+                    onPress={() =>
+                      navigation.navigate('CircuitDetail', { circuitId: circuit.id, roomId })
+                    }
+                  >
+                    <ChevronRight color={palette.gray400} size={16} />
+                  </Pressable>
                 </View>
-              </Pressable>
+              </View>
             ))
           )}
         </View>
