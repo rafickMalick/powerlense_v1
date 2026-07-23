@@ -5,11 +5,10 @@ import { palette } from '@/theme/colors';
 
 const useNative = Platform.OS !== 'web';
 
-const BG: Record<string, string> = {
-  success: palette.success,
-  error:   palette.danger,
-  info:    palette.navy700,
-};
+// Fonctions (et non constantes) : une valeur lue au niveau module serait figée
+// à l'import et ne suivrait pas la bascule clair/sombre.
+const bgFor = (type: string): string =>
+  type === 'success' ? palette.success : type === 'error' ? palette.danger : palette.navy700;
 
 const ICON: Record<string, string> = {
   success: '✓',
@@ -62,7 +61,7 @@ export function Toast() {
     >
       <View
         style={{
-          backgroundColor: BG[displayed.type],
+          backgroundColor: bgFor(displayed.type),
           borderRadius: 12,
           paddingHorizontal: 16,
           paddingVertical: 12,

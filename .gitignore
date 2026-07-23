@@ -56,3 +56,6 @@ tools/
 
 # Sauvegardes locales
 *.bak
+
+# Archives de handoff design (sources, non nécessaires au build)
+*.zip

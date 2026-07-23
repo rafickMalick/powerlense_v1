@@ -22,7 +22,8 @@ const BREAKDOWN_LABELS: Record<keyof RankingEntry['breakdown'], string> = {
   efficiency: 'Efficacité (cos φ)',
 };
 
-const PODIUM_COLORS = [palette.warning, palette.gray400, '#B45309'];
+// Fonction (et non constante) : suit la bascule clair/sombre.
+const podiumColor = (i: number) => [palette.warning, palette.gray400, "#B45309"][i];
 
 function RankRow({ entry }: { entry: RankingEntry }) {
   const [expanded, setExpanded] = useState(false);
@@ -137,7 +138,7 @@ export function RankingScreen() {
               <View className="flex-row items-end justify-around">
                 {podium.map((entry, i) => (
                   <View key={entry.zoneId} className="items-center flex-1">
-                    <Medal color={PODIUM_COLORS[i]} size={i === 0 ? 28 : 22} />
+                    <Medal color={podiumColor(i)} size={i === 0 ? 28 : 22} />
                     <Text className="text-xs text-text-primary font-medium mt-1 text-center" numberOfLines={1}>
                       {entry.zoneName}
                     </Text>

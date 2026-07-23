@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { View, Text, Pressable, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Bell, Building2, ChevronDown, ChevronLeft, WifiOff, Cpu } from 'lucide-react-native';
+import { Bell, Building2, ChevronDown, ChevronLeft, WifiOff, Cpu, Sun, Moon } from 'lucide-react-native';
+import { useThemeStore } from '@/theme/useTheme';
 import { useBuildingStore, useActiveBuilding } from '@/store/buildingStore';
 import { useAlertsStore } from '@/store/alertsStore';
 import { useUiStore } from '@/store/uiStore';
@@ -28,6 +29,8 @@ export function Header({ showBack = false }: HeaderProps) {
   // ESP attendu (mode matériel) mais absent : détecté immédiatement via le LWT,
   // sans attendre le basculement du provider (silence des mesures).
   const espUnreachable = providerMode === 'mqtt' && !deviceOnline;
+  const themeMode = useThemeStore((s) => s.mode);
+  const toggleTheme = useThemeStore((s) => s.toggle);
   const unreadAlerts = useAlertsStore((s) => s.alerts.filter((a) => !a.acknowledged).length);
   const fetchInitialAlerts = useAlertsStore((s) => s.fetchInitial);
 
@@ -78,6 +81,20 @@ export function Header({ showBack = false }: HeaderProps) {
       </View>
 
       <View className="flex-row items-center gap-2">
+        {/* Bascule clair/sombre — état partagé et persisté (cf. useThemeStore) */}
+        <Pressable
+          onPress={toggleTheme}
+          hitSlop={8}
+          className="w-8 h-8 items-center justify-center rounded"
+          accessibilityLabel={themeMode === 'dark' ? 'Passer en thème clair' : 'Passer en thème sombre'}
+        >
+          {themeMode === 'dark' ? (
+            <Sun size={18} color={palette.gray500} />
+          ) : (
+            <Moon size={18} color={palette.gray500} />
+          )}
+        </Pressable>
+
         {/* Cloche Alertes — accès 1 tap depuis n'importe quel onglet */}
         <Pressable
           onPress={() => navigation.navigate('More', { screen: 'Alerts' })}

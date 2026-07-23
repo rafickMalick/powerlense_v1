@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuthStore } from '@/store/authStore';
 import { useBuildingStore } from '@/store/buildingStore';
 import { useUiStore } from '@/store/uiStore';
+import { useThemeStore } from '@/theme/useTheme';
 import { palette } from '@/theme/colors';
 import { WelcomeCarousel } from '@/components/onboarding/WelcomeCarousel';
 import { AuthStack } from './AuthStack';
@@ -26,6 +27,11 @@ const navigationTheme = {
 };
 
 export function RootNavigator() {
+  // S'abonner au thème ici fait re-rendre tout l'arbre à la bascule : les
+  // couleurs lues en JS (icônes lucide, SVG, graphiques) sont ainsi relues avec
+  // la nouvelle palette. Simple re-rendu, pas un remontage → la navigation en
+  // cours est préservée.
+  useThemeStore((s) => s.mode);
   const status = useAuthStore((s) => s.status);
   const restore = useAuthStore((s) => s.restore);
   const fetchBuildings = useBuildingStore((s) => s.fetchBuildings);

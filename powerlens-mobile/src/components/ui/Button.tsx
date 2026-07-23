@@ -11,7 +11,7 @@ interface ButtonProps extends Omit<PressableProps, 'children'> {
 }
 
 const VARIANT_STYLES: Record<ButtonVariant, string> = {
-  default: 'bg-primary active:bg-primary-hover shadow-card',
+  default: 'bg-primary active:bg-primary-hover shadow-cta',
   outline: 'bg-transparent border border-border active:bg-surface-alt',
   ghost: 'bg-transparent active:bg-surface-alt',
   destructive: 'bg-danger active:bg-danger shadow-card',
@@ -40,7 +40,7 @@ export function Button({
   return (
     <Pressable
       disabled={disabled || loading}
-      className={`flex-row items-center justify-center gap-2 p-3 rounded-lg ${VARIANT_STYLES[variant]} ${
+      className={`flex-row items-center justify-center gap-2 p-3 rounded-cta ${VARIANT_STYLES[variant]} ${
         disabled ? 'opacity-50' : ''
       } ${className}`}
       {...props}
