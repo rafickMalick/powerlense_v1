@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "bash build-web.sh",
+  "outputDirectory": "dist",
+  "installCommand": "cd powerlens-mobile && npm install",
+  "rewrites": [
+    { "source": "/app/:path*", "destination": "/app/index.html" }
+  ]
+}

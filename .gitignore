@@ -19,6 +19,7 @@ metro.log
 # indispensables au build — sans eux `expo export` échoue. Les règles d'images
 # ci-dessus ne visent que les captures d'écran de développement à la racine.
 !powerlens-mobile/assets/**
+!landing/assets/**
 *.bmp
 *.docx
 *.xlsx
@@ -59,3 +60,6 @@ tools/
 
 # Archives de handoff design (sources, non nécessaires au build)
 *.zip
+
+# Sortie du build web unifié
+dist/
